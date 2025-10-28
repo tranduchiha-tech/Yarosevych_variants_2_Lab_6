@@ -1,0 +1,289 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+import warnings
+warnings.filterwarnings('ignore')
+
+
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+plt.rcParams['axes.unicode_minus'] = False
+
+print("=" * 80)
+print("АНАЛІЗ БАЗИ ДАНИХ СТРАХУВАННЯ З МАШИННИМ НАВЧАННЯМ")
+print("=" * 80)
+
+
+
+
+try:
+    df = pd.read_csv('insurance.csv')
+    print("\n✓ Дані успішно завантажено!")
+except FileNotFoundError:
+    print("\n✗ ПОМИЛКА: Файл insurance.csv не знайдено!")
+    print("Завантажте файл з Kaggle або іншого джерела")
+    exit()
+
+
+print("\n" + "=" * 80)
+print("СТРУКТУРА ДАНИХ")
+print("=" * 80)
+print(f"\nРозмір датасету: {df.shape[0]} рядків, {df.shape[1]} стовпців")
+print("\nПерші 5 записів:")
+print(df.head())
+print("\nІнформація про дані:")
+print(df.info())
+print("\nСтатистичний опис:")
+print(df.describe())
+
+
+print("\n" + "=" * 80)
+print("АДАПТАЦІЯ ДАНИХ ДЛЯ ЛІНІЙНОЇ РЕГРЕСІЇ")
+print("=" * 80)
+
+
+df_encoded = df.copy()
+
+# Кодування статі: male = 1, female = 0
+df_encoded['sex'] = df_encoded['sex'].map({'male': 1, 'female': 0})
+
+# Кодування факту куріння: yes = 1, no = 0
+df_encoded['smoker'] = df_encoded['smoker'].map({'yes': 1, 'no': 0})
+
+print("\n✓ Категоріальні змінні перетворено у числові:")
+print("  - sex: male=1, female=0")
+print("  - smoker: yes=1, no=0")
+print("\nПерші 5 записів після кодування:")
+print(df_encoded[['age', 'sex', 'smoker', 'charges']].head())
+
+
+X = df_encoded[['age', 'sex', 'smoker']]  # Незалежні змінні
+y = df_encoded['charges']  # Залежна змінна
+
+print(f"\nОзнаки для моделі: {list(X.columns)}")
+print(f"Цільова змінна: charges (вартість страхування)")
+
+
+print("\n" + "=" * 80)
+print("РОЗДІЛЕННЯ ДАНИХ")
+print("=" * 80)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+print(f"\n✓ Дані розділено (80% навчання, 20% тестування):")
+print(f"  - Навчальна вибірка: {X_train.shape[0]} записів")
+print(f"  - Тестова вибірка: {X_test.shape[0]} записів")
+
+print("\n" + "=" * 80)
+print("ПОБУДОВА МОДЕЛІ МАШИННОГО НАВЧАННЯ")
+print("=" * 80)
+
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+print("\n✓ Модель лінійної регресії побудовано!")
+print(f"\nКоефіцієнти моделі:")
+print(f"  - Вік (age): {model.coef_[0]:.2f}")
+print(f"  - Стать (sex): {model.coef_[1]:.2f}")
+print(f"  - Куріння (smoker): {model.coef_[2]:.2f}")
+print(f"  - Вільний член: {model.intercept_:.2f}")
+
+# Формула моделі
+print(f"\nФормула моделі:")
+print(f"charges = {model.intercept_:.2f} + {model.coef_[0]:.2f}*age + "
+      f"{model.coef_[1]:.2f}*sex + {model.coef_[2]:.2f}*smoker")
+
+
+y_pred = model.predict(X_test)
+
+
+print("\n" + "=" * 80)
+print("ПОРІВНЯННЯ ПРОГНОЗОВАНИХ ТА РЕАЛЬНИХ РЕЗУЛЬТАТІВ")
+print("=" * 80)
+
+
+comparison = pd.DataFrame({
+    'Реальні дані': y_test.values,
+    'Прогноз': y_pred,
+    'Різниця': y_test.values - y_pred,
+    'Абсолютна похибка': np.abs(y_test.values - y_pred),
+    'Відсоткова похибка (%)': (np.abs(y_test.values - y_pred) / y_test.values) * 100
+})
+
+print("\nПерші 10 результатів порівняння:")
+print(comparison.head(10).to_string(index=False))
+
+
+mae = mean_absolute_error(y_test, y_pred)
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+mean_percentage_error = comparison['Відсоткова похибка (%)'].mean()
+
+print(f"\n{'Метрики якості моделі:'}")
+print(f"  - Середня абсолютна похибка (MAE): ${mae:.2f}")
+print(f"  - Середньоквадратична похибка (MSE): ${mse:.2f}")
+print(f"  - Корінь з MSE (RMSE): ${rmse:.2f}")
+print(f"  - Коефіцієнт детермінації (R²): {r2:.4f}")
+print(f"  - Середня відсоткова похибка: {mean_percentage_error:.2f}%")
+
+
+print("\n" + "=" * 80)
+print("ВІЗУАЛІЗАЦІЯ РЕЗУЛЬТАТІВ")
+print("=" * 80)
+
+
+fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+
+
+axes[0, 0].hist(comparison['Відсоткова похибка (%)'], bins=30, 
+                color='skyblue', edgecolor='black', alpha=0.7)
+axes[0, 0].set_xlabel('Відсоткова похибка (%)', fontsize=11, fontweight='bold')
+axes[0, 0].set_ylabel('Кількість прогнозів', fontsize=11, fontweight='bold')
+axes[0, 0].set_title('Розподіл відсоткових похибок прогнозування', 
+                     fontsize=12, fontweight='bold', pad=15)
+axes[0, 0].axvline(mean_percentage_error, color='red', linestyle='--', 
+                   linewidth=2, label=f'Середнє: {mean_percentage_error:.1f}%')
+axes[0, 0].legend()
+axes[0, 0].grid(axis='y', alpha=0.3)
+
+
+axes[0, 1].scatter(y_test, y_pred, alpha=0.5, color='green', s=30)
+axes[0, 1].plot([y_test.min(), y_test.max()], 
+                [y_test.min(), y_test.max()], 
+                'r--', lw=2, label='Ідеальний прогноз')
+axes[0, 1].set_xlabel('Реальні значення ($)', fontsize=11, fontweight='bold')
+axes[0, 1].set_ylabel('Прогнозовані значення ($)', fontsize=11, fontweight='bold')
+axes[0, 1].set_title('Реальні vs Прогнозовані значення', 
+                     fontsize=12, fontweight='bold', pad=15)
+axes[0, 1].legend()
+axes[0, 1].grid(alpha=0.3)
+
+
+axes[1, 0].hist(comparison['Абсолютна похибка'], bins=30, 
+                color='orange', edgecolor='black', alpha=0.7)
+axes[1, 0].set_xlabel('Абсолютна похибка ($)', fontsize=11, fontweight='bold')
+axes[1, 0].set_ylabel('Кількість прогнозів', fontsize=11, fontweight='bold')
+axes[1, 0].set_title('Розподіл абсолютних похибок', 
+                     fontsize=12, fontweight='bold', pad=15)
+axes[1, 0].axvline(mae, color='red', linestyle='--', 
+                   linewidth=2, label=f'MAE: ${mae:.0f}')
+axes[1, 0].legend()
+axes[1, 0].grid(axis='y', alpha=0.3)
+
+
+residuals = y_test.values - y_pred
+axes[1, 1].scatter(y_pred, residuals, alpha=0.5, color='purple', s=30)
+axes[1, 1].axhline(y=0, color='red', linestyle='--', linewidth=2)
+axes[1, 1].set_xlabel('Прогнозовані значення ($)', fontsize=11, fontweight='bold')
+axes[1, 1].set_ylabel('Залишки ($)', fontsize=11, fontweight='bold')
+axes[1, 1].set_title('Графік залишків', 
+                     fontsize=12, fontweight='bold', pad=15)
+axes[1, 1].grid(alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('insurance_analysis.png', dpi=300, bbox_inches='tight')
+print("\n✓ Графіки збережено у файл 'insurance_analysis.png'")
+
+
+print("\n" + "=" * 80)
+print("ВИСНОВОК ПРО ЕФЕКТИВНІСТЬ МОДЕЛІ")
+print("=" * 80)
+
+print("\n ОЦІНКА ЯКОСТІ МОДЕЛІ:")
+print("-" * 80)
+
+
+if r2 >= 0.8:
+    r2_interpretation = "ВІДМІННА"
+elif r2 >= 0.6:
+    r2_interpretation = "ДОБРА"
+elif r2 >= 0.4:
+    r2_interpretation = "ЗАДОВІЛЬНА"
+else:
+    r2_interpretation = "НИЗЬКА"
+
+print(f"\n1. Коефіцієнт детермінації (R² = {r2:.4f}) - {r2_interpretation}")
+print(f"   Модель пояснює {r2*100:.2f}% варіації вартості страхування.")
+
+
+if mean_percentage_error <= 15:
+    error_interpretation = "ВІДМІННА точність"
+elif mean_percentage_error <= 25:
+    error_interpretation = "ДОБРА точність"
+elif mean_percentage_error <= 35:
+    error_interpretation = "ЗАДОВІЛЬНА точність"
+else:
+    error_interpretation = "НИЗЬКА точність"
+
+print(f"\n2. Середня відсоткова похибка ({mean_percentage_error:.2f}%) - {error_interpretation}")
+
+print(f"\n3. Середня абсолютна похибка: ${mae:.2f}")
+print(f"   В середньому модель помиляється на ${mae:.2f}")
+
+
+print("\n4. Аналіз впливу факторів:")
+print(f"   • ВІК: За кожен рік віку вартість страхування збільшується на ${model.coef_[0]:.2f}")
+if model.coef_[1] > 0:
+    print(f"   • СТАТЬ: Чоловіки платять на ${abs(model.coef_[1]):.2f} більше за страхування")
+else:
+    print(f"   • СТАТЬ: Жінки платять на ${abs(model.coef_[1]):.2f} більше за страхування")
+print(f"   • КУРІННЯ: Курці платять на ${model.coef_[2]:.2f} більше за страхування")
+
+print("\n" + "=" * 80)
+print("ЗАГАЛЬНИЙ ВИСНОВОК:")
+print("=" * 80)
+
+if r2 >= 0.6 and mean_percentage_error <= 30:
+    conclusion = """
+Побудована модель лінійної регресії показує ХОРОШІ результати для прогнозування
+вартості страхування на основі віку, статі та факту куріння.
+
+СИЛЬНІ СТОРОНИ:
+• Модель добре пояснює варіацію даних (R² > 0.6)
+• Прийнятна точність прогнозів
+• Простота інтерпретації коефіцієнтів
+• Швидкість обчислень
+
+РЕКОМЕНДАЦІЇ ДЛЯ ПОКРАЩЕННЯ:
+• Додати додаткові ознаки (BMI, регіон, кількість дітей)
+• Спробувати нелінійні моделі (polynomial regression)
+• Провести feature engineering
+• Розглянути більш складні моделі (Random Forest, XGBoost)
+"""
+else:
+    conclusion = """
+Побудована модель має ОБМЕЖЕНУ ефективність для прогнозування вартості
+страхування на основі лише трьох факторів.
+
+ПРОБЛЕМИ:
+• Модель пояснює недостатню частку варіації даних
+• Висока похибка прогнозування
+• Можливо, лінійна залежність не є оптимальною
+
+РЕКОМЕНДАЦІЇ:
+• ОБОВ'ЯЗКОВО додати більше ознак (BMI є критично важливим!)
+• Використати нелінійні моделі
+• Провести детальний аналіз викидів
+• Розглянути ансамблеві методи
+"""
+
+print(conclusion)
+
+
+print("\n ДОДАТКОВА СТАТИСТИКА:")
+print(f"  • Мінімальна похибка: {comparison['Абсолютна похибка'].min():.2f}$")
+print(f"  • Максимальна похибка: {comparison['Абсолютна похибка'].max():.2f}$")
+print(f"  • Медіанна похибка: {comparison['Абсолютна похибка'].median():.2f}$")
+print(f"  • 75-й перцентиль похибки: {comparison['Абсолютна похибка'].quantile(0.75):.2f}$")
+
+plt.show()
+
+print("\n" + "=" * 80)
+print("АНАЛІЗ ЗАВЕРШЕНО")
+print("=" * 80)
